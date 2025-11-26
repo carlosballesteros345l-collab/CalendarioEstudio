@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calendario de estudio — Corregido</title>
+  <!-- Tailwind CSS desde CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.5rem; }
+    .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-semibold">Calendario de estudio</h1>
+        <p class="text-sm text-slate-500">Organiza exámenes, trabajos y deberes con un calendario inteligente.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="prevMonthBtn" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">Mes anterior</button>
+        <button id="nextMonthBtn" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">Mes siguiente</button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="mb-4">
+      <nav class="flex border-b border-slate-200">
+        <button data-tab="calendar" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent hover:text-slate-900">Calendario</button>
+        <button data-tab="tasks" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent hover:text-slate-900">Añadir/Quitar tareas</button>
+        <button data-tab="availability" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent hover:text-slate-900">Horas disponibles por día</button>
+        <button data-tab="analysis" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent hover:text-slate-900">Análisis y planificación</button>
+      </nav>
+    </div>
+
+    <!-- Calendar View -->
+    <section id="calendarTab" class="tab-panel">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-lg font-medium" id="currentMonthLabel"></div>
+        <div class="text-sm text-slate-500">Clic en un día para ver recomendaciones.</div>
+      </div>
+      <div class="calendar-grid">
+        <div class="text-xs font-semibold text-slate-600 text-center">Lun</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Mar</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Mié</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Jue</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Vie</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Sáb</div>
+        <div class="text-xs font-semibold text-slate-600 text-center">Dom</div>
+      </div>
+      <div id="calendarDays" class="calendar-grid mt-2"></div>
+      <div class="mt-4 text-sm text-slate-500">
+        Los exámenes/trabajos/deberes con fecha en un día se muestran en negro oscuro dentro del recuadro de ese día.
+      </div>
+    </section>
+
+    <!-- Tasks Tab -->
+    <section id="tasksTab" class="tab-panel hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <h2 class="text-lg font-semibold mb-2">Añadir tarea</h2>
+          <p class="text-sm text-slate-500 mb-4">Introduce tu examen, trabajo o deber con su fecha y horas estimadas.</p>
+          <form id="taskForm" class="space-y-3">
+            <div>
+              <label class="text-sm font-medium">Tipo</label>
+              <select id="taskType" class="mt-1 w-full rounded-lg border-slate-300">
+                <option value="Examen">Examen</option>
+                <option value="Trabajo">Trabajo</option>
+                <option value="Deber">Deber</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm font-medium">Título</label>
+              <input id="taskTitle" type="text" class="mt-1 w-full rounded-lg border-slate-300" placeholder="Ej.: Matemáticas — Tema 3" required>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm font-medium">Fecha</label>
+                <input id="taskDate" type="date" class="mt-1 w-full rounded-lg border-slate-300" required>
+              </div>
+              <div>
+                <label class="text-sm font-medium">Horas necesarias</label>
+                <input id="taskHours" type="number" min="0.5" step="0.5" class="mt-1 w-full rounded-lg border-slate-300" placeholder="Ej.: 6" required>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium">Buffer extra</label>
+              <select id="taskBuffer" class="mt-1 rounded-lg border-slate-300">
+                <option value="1">+1 hora</option>
+                <option value="2">+2 horas</option>
+                <option value="0">sin buffer</option>
+              </select>
+              <span class="text-xs text-slate-500">Se añadirá a las horas necesarias.</span>
+            </div>
+            <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Guardar tarea</button>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <h2 class="text-lg font-semibold mb-2">Tareas guardadas</h2>
+          <p class="text-sm text-slate-500 mb-4">Elimina o edita cualquier elemento.</p>
+          <div id="taskList" class="space-y-2 max-h-80 overflow-auto scroll-thin"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Availability Tab -->
+    <section id="availabilityTab" class="tab-panel hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h2 class="text-lg font-semibold mb-2">Horas disponibles por día</h2>
+        <p class="text-sm text-slate-500 mb-4">Indica cuántas horas prevés poder estudiar en cada día del mes mostrado.</p>
+        <div id="availabilityGrid" class="calendar-grid"></div>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="copyAvailabilityForward" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">Copiar al siguiente mes</button>
+          <button id="clearAvailability" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">Limpiar mes</button>
+        </div>
+        <div id="availabilitySummary" class="mt-3 text-sm text-indigo-600 font-medium"></div>
+      </div>
+    </section>
+
+    <!-- Analysis Tab -->
+    <section id="analysisTab" class="tab-panel hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h2 class="text-lg font-semibold mb-2">Planificación automática</h2>
+        <p class="text-sm text-slate-500 mb-4">
+          La app distribuye tus horas de estudio usando principios científicos: sesiones cortas, descansos tipo Pomodoro, práctica espaciada
+          y concentración limitada por día. Además añade 1–2 horas extra de seguridad según tu elección.
+        </p>
+        <div class="flex items-center gap-2 mb-4">
+          <button id="runPlanning" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Generar planificación</button>
+          <button id="resetPlanning" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">Borrar planificación</button>
+        </div>
+        <div id="planningSummary" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- Modal Day Detail -->
+    <div id="dayModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-lg max-w-md w-full">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <h3 id="modalDateLabel" class="font-semibold">Detalle del día</h3>
+          <button id="closeModalBtn" class="p-2 rounded hover:bg-slate-100" type="button" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="p-4 space-y-3 max-h-96 overflow-auto scroll-thin">
+          <div id="modalTasks" class="space-y-2"></div>
+          <div id="modalPlan" class="space-y-2"></div>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-200 text-xs text-slate-500">
+          Consejo: usa bloques de 25–40 min con descansos breves para mantener la concentración (estilo Pomodoro).
+        </div>
+      </div>
+    </div>
+
+    <!-- Botón global para borrar todos los datos guardados -->
+    <div class="mt-6 flex justify-center">
+      <button id="resetAllBtn" class="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-sm">
+        Borrar todos los datos guardados
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-8 text-center text-xs text-slate-500">
+      Hecho con Tailwind CSS y mucho cariño por tu estudio.
+    </footer>
+  </div>
+
+  <script>
+    // -----------------------------
+    // Utilidades de fecha
+    // -----------------------------
+    const pad = (n) => String(n).padStart(2, '0');
+    const toISO = (date) => {
+      const y = date.getFullYear();
+      const m = pad(date.getMonth() + 1);
+      const d = pad(date.getDate());
+      return `${y}-${m}-${d}`;
+    };
+    const parseISO = (iso) => {
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate() + days); return d; };
+
+    // -----------------------------
+    // Formateo horas
+    // -----------------------------
+    const formatHours = (hoursDecimal) => {
+      const totalMinutes = Math.round((hoursDecimal || 0) * 60);
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      if (h === 0 && m === 0) return '0 h';
+      if (m === 0) return `${h} h`;
+      if (h === 0) return `${m} min`;
+      return `${h} h ${m} min`;
+    };
+
+    // -----------------------------
+    // Estado y persistencia
+    // -----------------------------
+    const state = {
+      currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      tasks: [],        // {id, type, title, dateISO, hours, buffer}
+      availability: {}, // { 'YYYY-MM-DD': hoursAvailable }
+      plan: {}          // { 'YYYY-MM-DD': [ {taskId, title, type, hours} ] }
+    };
+
+    const saveState = () => {
+      try {
+        // Guardar currentMonth como ISO para evitar problemas con serialización
+        const copy = { ...state, currentMonth: state.currentMonth.toISOString() };
+        localStorage.setItem('studyCalendarState', JSON.stringify(copy));
+      } catch(e) {
+        console.warn('saveState failed', e);
+      }
+    };
+    const loadState = () => {
+      const raw = localStorage.getItem('studyCalendarState');
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          if (data.currentMonth) state.currentMonth = new Date(data.currentMonth);
+          if (Array.isArray(data.tasks)) state.tasks = data.tasks;
+          if (data.availability && typeof data.availability === 'object') state.availability = data.availability;
+          if (data.plan && typeof data.plan === 'object') state.plan = data.plan;
+        } catch(e){ console.warn('loadState failed', e); }
+      }
+    };
+
+    // -----------------------------
+    // Tabs
+    // -----------------------------
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanels = {
+      calendar: document.getElementById('calendarTab'),
+      tasks: document.getElementById('tasksTab'),
+      availability: document.getElementById('availabilityTab'),
+      analysis: document.getElementById('analysisTab')
+    };
+    const setActiveTab = (name) => {
+      Object.keys(tabPanels).forEach(k => tabPanels[k].classList.toggle('hidden', k !== name));
+      tabButtons.forEach(btn => {
+        const active = btn.dataset.tab === name;
+        btn.classList.toggle('text-indigo-600', active);
+        btn.classList.toggle('border-indigo-600', active);
+        btn.classList.toggle('border-b-2', active);
+      });
+    };
+    tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+
+    // -----------------------------
+    // Renderizado de calendario
+    // -----------------------------
+    const currentMonthLabel = document.getElementById('currentMonthLabel');
+    const calendarDays = document.getElementById('calendarDays');
+
+    const renderCalendar = () => {
+      const monthStart = startOfMonth(state.currentMonth);
+      const monthEnd = endOfMonth(state.currentMonth);
+      const firstWeekday = (monthStart.getDay() || 7) - 1; // lunes=0
+      const daysInMonth = monthEnd.getDate();
+
+      currentMonthLabel.textContent = monthStart.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+      calendarDays.innerHTML = '';
+      // Relleno anterior
+      for (let i = 0; i < firstWeekday; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'rounded-lg border border-slate-200 bg-slate-100 h-24';
+        calendarDays.appendChild(cell);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+        const iso = toISO(date);
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'rounded-lg border border-slate-200 bg-white h-24 p-2 text-left hover:shadow-sm hover:border-slate-300';
+        cell.dataset.iso = iso;
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between';
+        const num = document.createElement('span');
+        num.className = 'text-sm font-medium';
+        num.textContent = String(day);
+        const avail = document.createElement('span');
+        const avHours = state.availability[iso] ?? 0;
+        avail.className = 'text-xs text-slate-500';
+        avail.textContent = avHours ? `${formatHours(avHours)} disp.` : '';
+        header.appendChild(num);
+        header.appendChild(avail);
+
+        const list = document.createElement('div');
+        list.className = 'mt-2 space-y-1 overflow-auto max-h-14 scroll-thin';
+        state.tasks
+          .filter(t => t.dateISO === iso)
+          .forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'text-xs font-semibold text-black truncate';
+            item.title = `${t.type}: ${t.title}`;
+            item.textContent = `${t.type}: ${t.title}`;
+            list.appendChild(item);
+          });
+
+        const planned = state.plan[iso] || [];
+        if (planned.length) {
+          const planBadge = document.createElement('div');
+          const total = planned.reduce((acc, p) => acc + (p.hours || 0), 0);
+          planBadge.className = 'mt-2 text-[11px] text-indigo-600';
+          planBadge.textContent = `Plan: ${formatHours(total)}`;
+          list.appendChild(planBadge);
+        }
+
+        cell.appendChild(header);
+        cell.appendChild(list);
+
+        cell.addEventListener('click', () => openDayModal(date));
+
+        calendarDays.appendChild(cell);
+      }
+
+      // Relleno final para completar filas (mantener múltiplos de 7)
+      const totalCells = calendarDays.children.length;
+      const remainder = totalCells % 7;
+      if (remainder !== 0) {
+        const toAdd = 7 - remainder;
+        for (let i = 0; i < toAdd; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'rounded-lg border border-slate-200 bg-slate-100 h-24';
+          calendarDays.appendChild(cell);
+        }
+      }
+    };
+
+    document.getElementById('prevMonthBtn').addEventListener('click', () => {
+      state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1);
+      renderAll(); saveState();
+    });
+    document.getElementById('nextMonthBtn').addEventListener('click', () => {
+      state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 1);
+      renderAll(); saveState();
+    });
+
+    // -----------------------------
+    // Gestión de tareas
+    // -----------------------------
+    const taskForm = document.getElementById('taskForm');
+    const taskList = document.getElementById('taskList');
+
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const type = document.getElementById('taskType').value;
+      const title = document.getElementById('taskTitle').value.trim();
+      const dateISO = document.getElementById('taskDate').value;
+      const hours = parseFloat(document.getElementById('taskHours').value);
+      const buffer = parseFloat(document.getElementById('taskBuffer').value || 0);
+      if (!title || !dateISO || isNaN(hours) || hours <= 0) return;
+
+      const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '-' + Math.floor(Math.random()*1e6);
+      state.tasks.push({ id, type, title, dateISO, hours, buffer });
+      state.tasks.sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+      taskForm.reset();
+      renderAll(); saveState();
+    });
+
+    const renderTaskList = () => {
+      taskList.innerHTML = '';
+      if (!state.tasks.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'No hay tareas añadidas.';
+        taskList.appendChild(empty);
+        return;
+      }
+
+      state.tasks.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2 border border-slate-200 rounded-lg';
+        const info = document.createElement('div');
+        info.className = 'text-sm';
+        const totalNeeded = (t.hours || 0) + (t.buffer || 0);
+        info.innerHTML = `<span class="font-semibold">${t.type}</span> — ${t.title}<br><span class="text-slate-500">${t.dateISO} • ${formatHours(totalNeeded)} totales</span>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'flex items-center gap-2';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs';
+        editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', () => {
+          const newTitle = prompt('Nuevo título:', t.title);
+          if (newTitle === null) return;
+          const newDate = prompt('Nueva fecha (YYYY-MM-DD):', t.dateISO);
+          if (newDate === null) return;
+          // Validar formato mínimo YYYY-MM-DD
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert('Fecha no válida. Usa el formato YYYY-MM-DD.'); return; }
+          const newHoursStr = prompt('Nuevas horas necesarias (usa decimales, p. ej., 1.5 = 1 h 30 min):', String(t.hours));
+          if (newHoursStr === null) return;
+          const newHours = parseFloat(newHoursStr || '');
+          if (isNaN(newHours) || newHours <= 0) { alert('Horas no válidas.'); return; }
+          const newBufferStr = prompt('Nuevo buffer (+horas):', String(t.buffer || 0));
+          if (newBufferStr === null) return;
+          const newBuffer = parseFloat(newBufferStr || '');
+          if (isNaN(newBuffer) || newBuffer < 0) { alert('Buffer no válido.'); return; }
+
+          t.title = newTitle.trim() || t.title;
+          t.dateISO = newDate || t.dateISO;
+          t.hours = newHours;
+          t.buffer = newBuffer;
+          state.tasks.sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+          renderAll(); saveState();
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs';
+        delBtn.textContent = 'Eliminar';
+        delBtn.addEventListener('click', () => {
+          if (!confirm('Eliminar tarea?')) return;
+          state.tasks = state.tasks.filter(x => x.id !== t.id);
+          Object.keys(state.plan).forEach(k => {
+            state.plan[k] = (state.plan[k] || []).filter(p => p.taskId !== t.id);
+            if (!state.plan[k] || !state.plan[k].length) delete state.plan[k];
+          });
+          renderAll(); saveState();
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(info);
+        row.appendChild(actions);
+        taskList.appendChild(row);
+      });
+    };
+
+    // -----------------------------
+    // Horas disponibles por día (con total del mes)
+    // -----------------------------
+    const availabilityGrid = document.getElementById('availabilityGrid');
+    const availabilitySummary = document.getElementById('availabilitySummary');
+
+    const renderAvailability = () => {
+      availabilityGrid.innerHTML = '';
+      const monthStart = startOfMonth(state.currentMonth);
+      const monthEnd = endOfMonth(state.currentMonth);
+      const firstWeekday = (monthStart.getDay() || 7) - 1;
+      const daysInMonth = monthEnd.getDate();
+
+      // Encabezados
+      const headers = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+      headers.forEach(h => {
+        const header = document.createElement('div');
+        header.className = 'text-xs font-semibold text-slate-600 text-center';
+        header.textContent = h;
+        availabilityGrid.appendChild(header);
+      });
+
+      // Relleno anterior
+      for (let i = 0; i < firstWeekday; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'rounded-lg border border-slate-200 bg-slate-100 h-24';
+        availabilityGrid.appendChild(cell);
+      }
+
+      let totalAvail = 0;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+        const iso = toISO(date);
+        const cell = document.createElement('div');
+        cell.className = 'rounded-lg border border-slate-200 bg-white h-24 p-2';
+
+        const label = document.createElement('div');
+        label.className = 'text-xs font-medium';
+        label.textContent = String(day);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = '0.5';
+        input.value = (typeof state.availability[iso] === 'number') ? state.availability[iso] : '';
+        input.placeholder = 'Horas';
+        input.className = 'mt-2 w-full rounded-lg border-slate-300 text-sm';
+        input.addEventListener('change', () => {
+          const val = parseFloat(input.value);
+          if (isNaN(val) || val < 0) {
+            delete state.availability[iso];
+          } else {
+            state.availability[iso] = val;
+          }
+          renderAll(); saveState();
+        });
+
+        if (typeof state.availability[iso] === 'number') totalAvail += state.availability[iso];
+
+        cell.appendChild(label);
+        cell.appendChild(input);
+        availabilityGrid.appendChild(cell);
+      }
+
+      // Relleno final para que cuadre en la malla
+      const totalCells = availabilityGrid.children.length;
+      const remainder = totalCells % 7;
+      if (remainder !== 0) {
+        const toAdd = 7 - remainder;
+        for (let i = 0; i < toAdd; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'rounded-lg border border-slate-200 bg-slate-100 h-24';
+          availabilityGrid.appendChild(cell);
+        }
+      }
+
+      availabilitySummary.textContent = `Total horas disponibles este mes: ${formatHours(totalAvail)}`;
+    };
+
+    document.getElementById('copyAvailabilityForward').addEventListener('click', () => {
+      const srcMonth = startOfMonth(state.currentMonth);
+      const nextMonth = new Date(srcMonth.getFullYear(), srcMonth.getMonth() + 1, 1);
+      const srcEnd = endOfMonth(srcMonth);
+      const daysInSrc = srcEnd.getDate();
+
+      for (let day = 1; day <= daysInSrc; day++) {
+        const srcISO = toISO(new Date(srcMonth.getFullYear(), srcMonth.getMonth(), day));
+        const val = state.availability[srcISO];
+        if (typeof val === 'number') {
+          const candidate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day);
+          // Solo copiar si el día existe en el mes destino (mismo month index)
+          if (candidate.getMonth() === nextMonth.getMonth()) {
+            const targetISO = toISO(candidate);
+            state.availability[targetISO] = val;
+          }
+        }
+      }
+      renderAll(); saveState();
+      alert('Horas copiadas al siguiente mes (días coincidentes).');
+    });
+
+    document.getElementById('clearAvailability').addEventListener('click', () => {
+      if (!confirm('¿Borrar disponibilidad y planificación de este mes?')) return;
+      const monthStart = startOfMonth(state.currentMonth);
+      const monthEnd = endOfMonth(state.currentMonth);
+      for (let day = 1; day <= monthEnd.getDate(); day++) {
+        const iso = toISO(new Date(monthStart.getFullYear(), monthStart.getMonth(), day));
+        delete state.availability[iso];
+        delete state.plan[iso];
+      }
+      renderAll(); saveState();
+    });
+
+    // -----------------------------
+    // Planificación automática: exámenes 7 días previos y resto de tareas
+    // -----------------------------
+    const remainingSpaceISO = (iso) => {
+      const avail = state.availability[iso] ?? 0;
+      const plannedTotal = (state.plan[iso] || []).reduce((acc,p)=>acc+p.hours,0);
+      return Math.max(0, avail - plannedTotal);
+    };
+
+    const pushPlan = (iso, task, hours) => {
+      const h = Math.max(0, hours);
+      if (h <= 0) return;
+      if (!state.plan[iso]) state.plan[iso] = [];
+      state.plan[iso].push({ taskId: task.id, title: task.title, type: task.type, hours: h });
+    };
+
+    const runPlanning = () => {
+      state.plan = {};
+
+      // Preparar tareas con horas totales (horas + buffer)
+      const tasks = state.tasks
+        .map(t => ({ ...t, totalHours: (t.hours || 0) + (t.buffer || 0), due: parseISO(t.dateISO) }))
+        .sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+
+      if (!tasks.length) { renderAll(); saveState(); renderPlanningSummary(); return; }
+
+      // Distribución específica para EXÁMENES en los 7 días previos (más carga en los dos últimos)
+      const examWeights = [0.10,0.10,0.10,0.10,0.10,0.20,0.30]; // desde -7 hasta -1
+      tasks.filter(t => t.type === 'Examen').forEach(exam => {
+        let remaining = exam.totalHours;
+
+        // Primera pasada por pesos (desde -7 hasta -1)
+        for (let offset = 7; offset >= 1; offset--) {
+          const d = addDays(exam.due, -offset);
+          const iso = toISO(d);
+          const room = remainingSpaceISO(iso);
+          if (room <= 0) continue;
+
+          const target = exam.totalHours * examWeights[7 - offset];
+          const assign = Math.min(room, target, remaining);
+          if (assign > 0) {
+            pushPlan(iso, exam, assign);
+            remaining -= assign;
+          }
+        }
+
+        // Segunda pasada: rellenar huecos empezando por el día más cercano
+        for (let offset = 1; offset <= 7 && remaining > 0; offset++) {
+          const d = addDays(exam.due, -offset);
+          const iso = toISO(d);
+          const room = remainingSpaceISO(iso);
+          if (room <= 0) continue;
+          const assign = Math.min(room, remaining);
+          pushPlan(iso, exam, assign);
+          remaining -= assign;
+        }
+
+        // Tercera pasada: ampliar ventana hasta -14 si aún faltan horas
+        for (let offset = 8; offset <= 14 && remaining > 0; offset++) {
+          const d = addDays(exam.due, -offset);
+          const iso = toISO(d);
+          const room = remainingSpaceISO(iso);
+          if (room <= 0) continue;
+          const assign = Math.min(room, remaining);
+          pushPlan(iso, exam, assign);
+          remaining -= assign;
+        }
+
+        exam.remaining = Math.max(0, remaining);
+      });
+
+      // Distribución para TRABAJOS y DEBERES hasta su fecha (máx. 1h/día respetando disponibilidad)
+      tasks.filter(t => t.type !== 'Examen').forEach(task => {
+        let remaining = task.totalHours;
+        const today = new Date();
+        const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        for (let d = new Date(start); d <= task.due && remaining > 0; d = addDays(d, 1)) {
+          const iso = toISO(d);
+          const room = remainingSpaceISO(iso);
+          if (room <= 0) continue;
+          const assign = Math.min(room, remaining, 1.0);
+          pushPlan(iso, task, assign);
+          remaining -= assign;
+        }
+        task.remaining = Math.max(0, remaining);
+      });
+
+      renderAll(); saveState(); renderPlanningSummary();
+      alert('Planificación generada. Clica un día del calendario para ver recomendaciones.');
+    };
+
+    const resetPlanning = () => { state.plan = {}; renderAll(); saveState(); renderPlanningSummary(); };
+
+    // -----------------------------
+    // Resumen de planificación con avisos si faltan horas
+    // -----------------------------
+    const planningSummary = document.getElementById('planningSummary');
+    const renderPlanningSummary = () => {
+      planningSummary.innerHTML = '';
+      if (!Object.keys(state.plan).length) {
+        const p = document.createElement('div');
+        p.className = 'text-sm text-slate-500';
+        p.textContent = 'No hay planificación generada.';
+        planningSummary.appendChild(p);
+        return;
+      }
+      const totalsByTask = {};
+      Object.keys(state.plan).forEach(iso => {
+        state.plan[iso].forEach(entry => {
+          totalsByTask[entry.taskId] = (totalsByTask[entry.taskId] || 0) + entry.hours;
+        });
+      });
+
+      state.tasks.forEach(t => {
+        const totalPlanned = (totalsByTask[t.id] || 0);
+        const totalNeeded = (t.hours || 0) + (t.buffer || 0);
+        const remainingFlag = Math.max(0, totalNeeded - totalPlanned);
+
+        const row = document.createElement('div');
+        row.className = 'p-2 border border-slate-200 rounded-lg text-sm';
+        row.innerHTML = `
+          <div>
+            <div class="font-semibold">${t.type}: ${t.title}</div>
+            <div class="text-slate-500">${t.dateISO} • Necesario: ${formatHours(totalNeeded)} • Planificado: ${formatHours(totalPlanned)}</div>
+            ${remainingFlag > 0 ? `<div class="text-rose-600 text-xs mt-1">⚠ Faltan ${formatHours(remainingFlag)} por planificar</div>` : ''}
+          </div>
+        `;
+        planningSummary.appendChild(row);
+      });
+    };
+
+    document.getElementById('runPlanning').addEventListener('click', runPlanning);
+    document.getElementById('resetPlanning').addEventListener('click', resetPlanning);
+
+    // -----------------------------
+    // Modal del día (detalle y recomendaciones)
+    // -----------------------------
+    const dayModal = document.getElementById('dayModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalDateLabel = document.getElementById('modalDateLabel');
+    const modalTasks = document.getElementById('modalTasks');
+    const modalPlan = document.getElementById('modalPlan');
+
+    const openDayModal = (date) => {
+      const iso = toISO(date);
+      modalDateLabel.textContent = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Tareas del día (con fecha objetivo ese día)
+      const dayTasks = state.tasks.filter(t => t.dateISO === iso);
+      modalTasks.innerHTML = '';
+      if (dayTasks.length) {
+        const box = document.createElement('div');
+        box.className = 'rounded-lg border border-slate-200 p-2';
+        const title = document.createElement('div');
+        title.className = 'text-sm font-semibold mb-1';
+        title.textContent = 'Tareas con fecha hoy:';
+        box.appendChild(title);
+        dayTasks.forEach(t => {
+          const item = document.createElement('div');
+          item.className = 'text-sm';
+          item.textContent = `${t.type} — ${t.title}`;
+          box.appendChild(item);
+        });
+        modalTasks.appendChild(box);
+      }
+
+      // Plan para el día
+      const planEntries = state.plan[iso] || [];
+      modalPlan.innerHTML = '';
+      const total = planEntries.reduce((acc, p) => acc + p.hours, 0);
+      const box2 = document.createElement('div');
+      box2.className = 'rounded-lg border border-slate-200 p-2';
+      const title2 = document.createElement('div');
+      title2.className = 'text-sm font-semibold mb-1';
+      title2.textContent = total ? `Horas recomendadas hoy: ${formatHours(total)}` : 'No hay horas planificadas para hoy.';
+      box2.appendChild(title2);
+
+      if (planEntries.length) {
+        planEntries.forEach(p => {
+          const line = document.createElement('div');
+          line.className = 'text-sm';
+          line.textContent = `${p.type}: ${p.title} — ${formatHours(p.hours)}`;
+          box2.appendChild(line);
+        });
+
+        const tip = document.createElement('div');
+        tip.className = 'mt-2 text-xs text-slate-600';
+        tip.textContent = 'Divide en bloques de 25–40 min, con descansos de 5–10 min. Revisa brevemente al final (práctica espaciada).';
+        box2.appendChild(tip);
+      }
+      modalPlan.appendChild(box2);
+
+      dayModal.classList.remove('hidden');
+      dayModal.classList.add('flex');
+    };
+
+    closeModalBtn.addEventListener('click', () => {
+      dayModal.classList.add('hidden');
+      dayModal.classList.remove('flex');
+    });
+
+    dayModal.addEventListener('click', (e) => {
+      if (e.target === dayModal) {
+        dayModal.classList.add('hidden');
+        dayModal.classList.remove('flex');
+      }
+    });
+
+    // -----------------------------
+    // Botón global: borrar todos los datos guardados
+    // -----------------------------
+    document.getElementById('resetAllBtn').addEventListener('click', () => {
+      if (confirm('¿Seguro que quieres borrar todas las tareas, disponibilidad y planificación?')) {
+        localStorage.removeItem('studyCalendarState');
+        state.tasks = [];
+        state.availability = {};
+        state.plan = {};
+        renderAll();
+        alert('Todos los datos han sido borrados.');
+      }
+    });
+
+    // -----------------------------
+    // Render global
+    // -----------------------------
+    const renderAll = () => { renderCalendar(); renderTaskList(); renderAvailability(); renderPlanningSummary(); };
+
+    // Init
+    loadState();
+    renderAll();
+    setActiveTab('calendar');
+  </script>
+</body>
+</html>
+
